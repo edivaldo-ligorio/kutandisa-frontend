@@ -103,6 +103,21 @@ export const paymentsApi = {
   getStats: () => apiFetch<Stats>('/payments/stats'),
 };
 
+// ── Favourites ───────────────────────────────────────────────
+export const favouritesApi = {
+  getAll: () => apiFetch<{ data: Destination[]; total: number }>('/favourites'),
+  add: (destinationId: number) =>
+    apiFetch<{ message: string }>(`/favourites/${destinationId}`, { method: 'POST' }),
+  remove: (destinationId: number) =>
+    apiFetch<{ message: string }>(`/favourites/${destinationId}`, { method: 'DELETE' }),
+};
+
+// ── Contact ──────────────────────────────────────────────────
+export const contactApi = {
+  send: (data: { name: string; email: string; subject: string; message: string }) =>
+    apiFetch<{ message: string }>('/contact', { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // ── Types ─────────────────────────────────────────────────────
 export interface User {
   id: number;
@@ -130,6 +145,8 @@ export interface Destination {
   bestTime: string;
   duration: string;
   difficulty: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface Booking {
@@ -138,8 +155,8 @@ export interface Booking {
   clientName: string;
   destinationId: number;
   destination: string;
-  operatorId: number;
-  operator: string;
+  operatorId: number | null;
+  operator: string | null;
   date: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   amount: number;

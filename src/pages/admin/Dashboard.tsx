@@ -1,8 +1,12 @@
-import { FiUsers, FiUserCheck, FiBookOpen, FiCreditCard, FiArrowRight, FiTrendingUp } from 'react-icons/fi';
+import { useEffect, useState } from 'react';
+import { FiUsers, FiUserCheck, FiBookOpen, FiCreditCard, FiArrowRight, FiLoader, FiAlertCircle } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Link } from 'react-router-dom';
 import StatsCard from '../../components/StatsCard';
+import { paymentsApi, usersApi, Stats, User } from '../../services/api';
 
+// Dados ilustrativos: o backend ainda não tem um endpoint de série temporal / categorias.
+// Mantidos apenas como exemplo visual do gráfico — não refletem números reais.
 const monthlyData = [
   { mes:'Jan', reservas:320, receita:48000 },
   { mes:'Fev', reservas:450, receita:67500 },
@@ -11,7 +15,6 @@ const monthlyData = [
   { mes:'Mai', reservas:610, receita:91500 },
   { mes:'Jun', reservas:750, receita:112500 },
 ];
-
 const pieData = [
   { name:'Alojamento', value:38, color:'#1D6A5A' },
   { name:'Restaurante', value:27, color:'#F5A623' },
@@ -19,25 +22,36 @@ const pieData = [
   { name:'Transporte', value:13, color:'#8B5CF6' },
 ];
 
-const recentUsers = [
-  { id:1, name:'Ana Rodrigues',  email:'ana@email.com',   role:'Cliente',   status:'active',   joined:'15 Mar 2026' },
-  { id:2, name:'Hotel Kilamba',  email:'kilamba@hotel.ao', role:'Operador',  status:'active',   joined:'14 Mar 2026' },
-  { id:3, name:'Pedro Lopes',    email:'pedro@email.com',  role:'Cliente',   status:'inactive', joined:'13 Mar 2026' },
-  { id:4, name:'Safari Co.',     email:'safari@ao.com',    role:'Operador',  status:'pending',  joined:'12 Mar 2026' },
-];
+const statusColor: Record<string,string> = { active:'badge-green', inactive:'badge-yellow', suspended:'badge-red' };
+const statusLabel: Record<string,string> = { active:'Activo', inactive:'Inactivo', suspended:'Bloqueado' };
 
-const statusColor: Record<string,string> = { active:'badge-green', inactive:'badge-red', pending:'badge-yellow' };
-const statusLabel: Record<string,string> = { active:'Activo', inactive:'Inactivo', pending:'Pendente' };
+function formatKz(amount: number) {
+  return new Intl.NumberFormat('pt-AO').format(amount) + ' Kz';
+}
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [recentUsers, setRecentUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    Promise.all([paymentsApi.getStats(), usersApi.getAll()])
+      .then(([s, u]) => { setStats(s); setRecentUsers(u.data.slice(-4).reverse()); })
+      .catch(err => setError(err.message || 'Não foi possível carregar o dashboard.'))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="space-y-8">
+      {error && <p className="text-sm text-red-500 flex items-center gap-2"><FiAlertCircle/> {error}</p>}
+
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total Utilizadores" value="12.456" icon={<FiUsers size={20}/>}     change="+12.5% este mês" />
-        <StatsCard title="Operadores Activos" value="892"    icon={<FiUserCheck size={20}/>} change="+8.3% este mês" />
-        <StatsCard title="Reservas Este Mês"  value="3.241"  icon={<FiBookOpen size={20}/>}  change="+15.2% este mês" />
-        <StatsCard title="Receita Total"      value="56,6M Kz"  icon={<FiCreditCard size={20}/>} change="+23.1% este mês" />
+        <StatsCard title="Total Clientes"      value={stats ? String(stats.totalUsers) : '—'}      icon={<FiUsers size={20}/>} />
+        <StatsCard title="Operadores"          value={stats ? String(stats.totalOperators) : '—'}  icon={<FiUserCheck size={20}/>} />
+        <StatsCard title="Total Reservas"      value={stats ? String(stats.totalBookings) : '—'}   icon={<FiBookOpen size={20}/>} change={stats ? `${stats.pendingBookings} pendentes` : undefined} changePositive={false} />
+        <StatsCard title="Receita Total"       value={stats ? formatKz(stats.totalRevenue) : '—'}  icon={<FiCreditCard size={20}/>} change={stats ? `${stats.confirmedBookings} confirmadas` : undefined} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -45,7 +59,7 @@ export default function AdminDashboard() {
         <div className="card p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold text-dark font-heading">Reservas & Receita Mensal</h3>
-            <span className="badge-green text-xs flex items-center gap-1"><FiTrendingUp size={11}/>+23% YoY</span>
+            <span className="badge-yellow text-xs">dados de exemplo</span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={monthlyData}>
@@ -61,7 +75,10 @@ export default function AdminDashboard() {
 
         {/* Pie chart */}
         <div className="card p-6">
-          <h3 className="font-bold text-dark font-heading mb-6">Categorias de Serviços</h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-dark font-heading">Categorias de Serviços</h3>
+          </div>
+          <span className="badge-yellow text-xs mb-4 inline-block">dados de exemplo</span>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value">
@@ -91,20 +108,27 @@ export default function AdminDashboard() {
             Ver todos <FiArrowRight size={14}/>
           </Link>
         </div>
-        <table className="data-table">
-          <thead><tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Registo</th><th>Estado</th></tr></thead>
-          <tbody>
-            {recentUsers.map(u => (
-              <tr key={u.id}>
-                <td className="font-semibold text-dark">{u.name}</td>
-                <td className="text-gray-500 text-xs">{u.email}</td>
-                <td><span className={`badge text-xs ${u.role==='Operador'?'badge-blue':'badge-primary'}`}>{u.role}</span></td>
-                <td className="text-gray-500 text-xs">{u.joined}</td>
-                <td><span className={`badge text-xs ${statusColor[u.status]}`}>{statusLabel[u.status]}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {loading ? (
+          <div className="p-10 flex items-center justify-center gap-2 text-gray-500"><FiLoader className="animate-spin"/> A carregar...</div>
+        ) : (
+          <table className="data-table">
+            <thead><tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Registo</th><th>Estado</th></tr></thead>
+            <tbody>
+              {recentUsers.map(u => (
+                <tr key={u.id}>
+                  <td className="font-semibold text-dark">{u.name}</td>
+                  <td className="text-gray-500 text-xs">{u.email}</td>
+                  <td><span className={`badge text-xs ${u.role==='operator'?'badge-blue':'badge-primary'}`}>{u.role==='operator'?'Operador':'Cliente'}</span></td>
+                  <td className="text-gray-500 text-xs">{u.joined}</td>
+                  <td><span className={`badge text-xs ${statusColor[u.status] || 'badge-yellow'}`}>{statusLabel[u.status] || u.status}</span></td>
+                </tr>
+              ))}
+              {recentUsers.length === 0 && (
+                <tr><td colSpan={5} className="text-center text-gray-400 py-8">Sem utilizadores.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

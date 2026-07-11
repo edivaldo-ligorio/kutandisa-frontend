@@ -1,27 +1,62 @@
-import { FiHeart, FiMapPin, FiStar } from 'react-icons/fi';
+import { useEffect, useState } from 'react';
+import { FiHeart, FiMapPin, FiStar, FiLoader, FiAlertCircle } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
-
-const favs = [
-  { id:1, name:'Miradouro da Lua', category:'Natureza', rating:4.8, price:'25.000–75.000 Kz', image:'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=400&q=80', province:'Luanda' },
-  { id:2, name:'Kalandula Falls',  category:'Natureza', rating:4.9, price:'40.000–100.000 Kz', image:'https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?w=400&q=80', province:'Malanje' },
-  { id:3, name:'Ilha do Mussulo',  category:'Praia',    rating:4.7, price:'30.000–90.000 Kz', image:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80', province:'Luanda' },
-  { id:4, name:'Pungo Andongo',    category:'História', rating:4.7, price:'35.000–90.000 Kz', image:'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=80', province:'Malanje' },
-];
+import { favouritesApi, Destination } from '../../services/api';
 
 export default function ClientFavourites() {
+  const [favs, setFavs] = useState<Destination[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = () => {
+    favouritesApi.getAll()
+      .then(res => setFavs(res.data))
+      .catch(err => setError(err.message || 'Não foi possível carregar os favoritos.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleRemove = async (id: number) => {
+    setFavs(prev => prev.filter(f => f.id !== id));
+    try {
+      await favouritesApi.remove(id);
+    } catch {
+      load(); // reverte se a chamada falhar
+    }
+  };
+
+  if (loading) {
+    return <div className="card p-10 flex items-center justify-center gap-2 text-gray-500"><FiLoader className="animate-spin" /> A carregar favoritos...</div>;
+  }
+  if (error) {
+    return <div className="card p-10 flex items-center justify-center gap-2 text-red-500"><FiAlertCircle /> {error}</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <FiHeart size={20} className="text-red-500 fill-red-500"/>
         <h2 className="text-lg font-bold text-dark">{favs.length} Destinos Favoritos</h2>
       </div>
+
+      {favs.length === 0 && (
+        <div className="card p-10 text-center text-gray-500">
+          Ainda não guardaste nenhum destino. Clica no coração num destino para o adicionares aqui.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {favs.map(f => (
-          <div key={f.id} className="card card-hover group overflow-hidden relative">
+          <Link key={f.id} to={`/destinos/${f.id}`} className="card card-hover group overflow-hidden relative block">
             <div className="h-48 overflow-hidden">
               <img src={f.image} alt={f.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
             </div>
-            <button className="absolute top-4 right-4 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
+            <button
+              onClick={(e) => { e.preventDefault(); handleRemove(f.id); }}
+              className="absolute top-4 right-4 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+              title="Remover dos favoritos"
+            >
               <FiHeart size={16} className="text-red-500 fill-red-500" />
             </button>
             <div className="p-5">
@@ -33,7 +68,7 @@ export default function ClientFavourites() {
                 <span className="font-bold text-primary text-sm">{f.price}</span>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

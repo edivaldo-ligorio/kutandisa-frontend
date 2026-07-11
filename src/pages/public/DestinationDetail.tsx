@@ -1,11 +1,13 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   FiArrowLeft, FiMapPin, FiStar, FiClock, FiCalendar,
-  FiCheckCircle, FiCamera, FiShare2, FiHeart, FiTrendingUp
+  FiCheckCircle, FiCamera, FiShare2, FiHeart, FiTrendingUp, FiLoader
 } from 'react-icons/fi';
 import { destinations } from '../../data/destinations';
+import { favouritesApi, bookingsApi } from '../../services/api';
+import { useAuthStore } from '../../stores/authStore';
 
 const difficultyColor: Record<string, string> = {
   'Fácil': 'badge-green',
@@ -19,6 +21,68 @@ export default function DestinationDetail() {
   const dest = destinations.find(d => d.id === Number(id));
   const [activeImg, setActiveImg] = useState(0);
   const [saved, setSaved] = useState(false);
+  const { isAuthenticated, role } = useAuthStore();
+
+  const [bookingDate, setBookingDate] = useState('');
+  const [bookingPeople, setBookingPeople] = useState(1);
+  const [booking, setBooking] = useState(false);
+  const [bookingDone, setBookingDone] = useState(false);
+  const [bookingError, setBookingError] = useState('');
+
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'client' || !dest) return;
+    favouritesApi.getAll()
+      .then(res => setSaved(res.data.some(d => d.id === dest.id)))
+      .catch(() => {});
+  }, [isAuthenticated, role, dest?.id]);
+
+  const toggleSaved = async () => {
+    if (!dest) return;
+    if (!isAuthenticated || role !== 'client') {
+      navigate('/entrar');
+      return;
+    }
+    const next = !saved;
+    setSaved(next); // otimista
+    try {
+      if (next) await favouritesApi.add(dest.id);
+      else await favouritesApi.remove(dest.id);
+    } catch {
+      setSaved(!next); // reverte se falhar
+    }
+  };
+
+  const parsePrice = (price: string) => {
+    const first = price.split('–')[0].trim();
+    return Number(first.replace(/[^\d]/g, '')) || 0;
+  };
+
+  const handleBook = async () => {
+    if (!dest) return;
+    if (!isAuthenticated || role !== 'client') {
+      navigate('/entrar');
+      return;
+    }
+    if (!bookingDate) {
+      setBookingError('Escolhe uma data de visita.');
+      return;
+    }
+    setBookingError('');
+    setBooking(true);
+    try {
+      await bookingsApi.create({
+        destinationId: dest.id,
+        date: bookingDate,
+        amount: parsePrice(dest.price) * bookingPeople,
+        people: bookingPeople,
+      });
+      setBookingDone(true);
+    } catch (err: any) {
+      setBookingError(err.message || 'Não foi possível criar a reserva.');
+    } finally {
+      setBooking(false);
+    }
+  };
 
   if (!dest) {
     return (
@@ -61,7 +125,7 @@ export default function DestinationDetail() {
           </button>
           <div className="flex gap-2">
             <button
-              onClick={() => setSaved(!saved)}
+              onClick={toggleSaved}
               className={`p-3 rounded-full backdrop-blur-sm border border-white/30 transition-all ${saved ? 'bg-red-500 border-red-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}
             >
               <FiHeart size={18} className={saved ? 'fill-white' : ''} />
@@ -212,19 +276,33 @@ export default function DestinationDetail() {
               <div className="space-y-3 mb-5">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1.5 block">Data de visita</label>
-                  <input type="date" className="input text-sm" />
+                  <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} className="input text-sm" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1.5 block">Número de pessoas</label>
-                  <select className="input text-sm">
-                    {[1,2,3,4,5,6,7,8].map(n => <option key={n}>{n} pessoa{n>1?'s':''}</option>)}
+                  <select value={bookingPeople} onChange={e => setBookingPeople(Number(e.target.value))} className="input text-sm">
+                    {[1,2,3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} pessoa{n>1?'s':''}</option>)}
                   </select>
                 </div>
               </div>
 
-              <Link to="/entrar" className="btn-primary w-full justify-center text-base py-3.5 mb-3">
-                Reservar Agora
-              </Link>
+              {bookingError && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">{bookingError}</p>
+              )}
+
+              {bookingDone ? (
+                <div className="flex items-center gap-2 justify-center bg-accent text-primary font-semibold text-sm rounded-xl py-3.5 mb-3">
+                  <FiCheckCircle size={18} /> Reserva criada com sucesso!
+                </div>
+              ) : isAuthenticated && role === 'client' ? (
+                <button onClick={handleBook} disabled={booking} className="btn-primary w-full justify-center text-base py-3.5 mb-3 disabled:opacity-60">
+                  {booking ? <><FiLoader size={16} className="animate-spin" /> A reservar...</> : 'Reservar Agora'}
+                </button>
+              ) : (
+                <Link to="/entrar" className="btn-primary w-full justify-center text-base py-3.5 mb-3">
+                  Reservar Agora
+                </Link>
+              )}
               <p className="text-center text-xs text-gray-400">Sem taxas de reserva ocultas</p>
 
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-2">
