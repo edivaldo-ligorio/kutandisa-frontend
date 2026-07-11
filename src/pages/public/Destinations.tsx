@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiMapPin, FiStar, FiSearch, FiArrowRight } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { destinations } from '../../data/destinations';
 
 const categories = ['Todos', 'Natureza', 'Praia', 'História', 'Cidade'];
 
 export default function Destinations() {
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const [cat, setCat] = useState('Todos');
 
   const filtered = destinations.filter(d =>

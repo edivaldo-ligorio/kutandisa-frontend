@@ -28,6 +28,21 @@ export default function DestinationDetail() {
   const [booking, setBooking] = useState(false);
   const [bookingDone, setBookingDone] = useState(false);
   const [bookingError, setBookingError] = useState('');
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const handleShare = async () => {
+    if (!dest) return;
+    const shareData = { title: `${dest.name} — Kutandisa`, text: `Descobre ${dest.name} no Kutandisa!`, url: window.location.href };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch { /* utilizador cancelou */ }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch { /* clipboard indisponível */ }
+  };
 
   useEffect(() => {
     if (!isAuthenticated || role !== 'client' || !dest) return;
@@ -116,7 +131,7 @@ export default function DestinationDetail() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/40" />
 
         {/* Top bar */}
-        <div className="absolute top-0 inset-x-0 p-6 flex items-center justify-between">
+        <div className="absolute top-20 md:top-24 inset-x-0 px-6 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 text-white rounded-full font-medium text-sm hover:bg-white/30 transition-all"
@@ -130,8 +145,11 @@ export default function DestinationDetail() {
             >
               <FiHeart size={18} className={saved ? 'fill-white' : ''} />
             </button>
-            <button className="p-3 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 transition-all">
+            <button onClick={handleShare} className="p-3 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 transition-all relative">
               <FiShare2 size={18} />
+              {shareCopied && (
+                <span className="absolute -bottom-9 right-0 bg-dark text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap">Link copiado!</span>
+              )}
             </button>
           </div>
         </div>
