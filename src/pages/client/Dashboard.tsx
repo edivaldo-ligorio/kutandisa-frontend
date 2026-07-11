@@ -1,24 +1,39 @@
-import { FiCalendar, FiHeart, FiMapPin, FiStar, FiArrowRight, FiClock } from 'react-icons/fi';
+import { useEffect, useState } from 'react';
+import { FiCalendar, FiHeart, FiMapPin, FiStar, FiArrowRight, FiClock, FiLoader } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import StatsCard from '../../components/StatsCard';
-
-const upcomingBookings = [
-  { id:1, destination:'Kalandula Falls', date:'15 Mar 2026', time:'09:00', status:'confirmed', image:'https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?w=300&q=80' },
-  { id:2, destination:'Hotel Luanda',    date:'22 Mar 2026', time:'14:00', status:'pending',   image:'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=300&q=80' },
-];
-
-const suggestions = [
-  { id:1, name:'Ilha do Mussulo', category:'Praia',    rating:4.7, price:'30.000–90.000 Kz', image:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300&q=80' },
-  { id:2, name:'Parque do Iona',  category:'Natureza', rating:4.6, price:'50.000–150.000 Kz',image:'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=300&q=80' },
-  { id:3, name:'Pungo Andongo',   category:'História', rating:4.7, price:'35.000–90.000 Kz', image:'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=300&q=80' },
-];
+import { bookingsApi, destinationsApi, favouritesApi, Booking, Destination } from '../../services/api';
 
 const statusColors: Record<string, string> = { confirmed:'badge-green', pending:'badge-yellow', cancelled:'badge-red' };
 const statusLabels: Record<string, string> = { confirmed:'Confirmado', pending:'Pendente', cancelled:'Cancelado' };
 
 export default function ClientDashboard() {
   const { user } = useAuthStore();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [suggestions, setSuggestions] = useState<Destination[]>([]);
+  const [favouritesCount, setFavouritesCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([bookingsApi.getAll(), destinationsApi.getAll(), favouritesApi.getAll()])
+      .then(([b, d, f]) => {
+        setBookings(b.data);
+        // sugestões: destinos com melhor avaliação que o cliente ainda não reservou
+        const bookedIds = new Set(b.data.map(x => x.destinationId));
+        setSuggestions(
+          [...d.data]
+            .filter(x => !bookedIds.has(x.id))
+            .sort((a, c) => c.rating - a.rating)
+            .slice(0, 3)
+        );
+        setFavouritesCount(f.total);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const upcoming = bookings.filter(b => b.status !== 'cancelled').slice(0, 3);
+  const visitedCount = new Set(bookings.filter(b => b.status === 'confirmed').map(b => b.destinationId)).size;
 
   return (
     <div className="space-y-8">
@@ -37,10 +52,10 @@ export default function ClientDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Reservas Activas" value="3"  icon={<FiCalendar size={20}/>} change="+1 este mês" />
-        <StatsCard title="Destinos Visitados" value="8" icon={<FiMapPin size={20}/>} change="+2 este ano" />
-        <StatsCard title="Favoritos"          value="12" icon={<FiHeart size={20}/>} />
-        <StatsCard title="Avaliações Feitas"  value="6"  icon={<FiStar size={20}/>} />
+        <StatsCard title="Reservas Activas" value={String(bookings.filter(b=>b.status!=='cancelled').length)} icon={<FiCalendar size={20}/>} />
+        <StatsCard title="Destinos Visitados" value={String(visitedCount)} icon={<FiMapPin size={20}/>} />
+        <StatsCard title="Favoritos" value={String(favouritesCount)} icon={<FiHeart size={20}/>} />
+        <StatsCard title="Avaliações Feitas" value="0" icon={<FiStar size={20}/>} change="em breve" changePositive={false} />
       </div>
 
       {/* Upcoming Bookings */}
@@ -51,21 +66,26 @@ export default function ClientDashboard() {
             Ver todas <FiArrowRight size={14}/>
           </Link>
         </div>
-        <div className="space-y-4">
-          {upcomingBookings.map(b => (
-            <div key={b.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-accent transition-colors">
-              <img src={b.image} alt={b.destination} className="w-16 h-16 rounded-xl object-cover shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-dark">{b.destination}</p>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs text-gray-500 flex items-center gap-1"><FiCalendar size={11}/>{b.date}</span>
-                  <span className="text-xs text-gray-500 flex items-center gap-1"><FiClock size={11}/>{b.time}</span>
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 text-gray-500 py-8"><FiLoader className="animate-spin"/> A carregar...</div>
+        ) : upcoming.length === 0 ? (
+          <p className="text-center text-gray-400 py-8">Ainda não tens reservas. <Link to="/destinos" className="text-primary font-semibold hover:underline">Explora destinos</Link></p>
+        ) : (
+          <div className="space-y-4">
+            {upcoming.map(b => (
+              <Link key={b.id} to={`/destinos/${b.destinationId}`} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-accent transition-colors">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-dark">{b.destination}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-xs text-gray-500 flex items-center gap-1"><FiCalendar size={11}/>{b.date}</span>
+                    <span className="text-xs text-gray-500 flex items-center gap-1"><FiClock size={11}/>{b.people} pessoa{b.people>1?'s':''}</span>
+                  </div>
                 </div>
-              </div>
-              <span className={`badge text-xs ${statusColors[b.status]}`}>{statusLabels[b.status]}</span>
-            </div>
-          ))}
-        </div>
+                <span className={`badge text-xs ${statusColors[b.status]}`}>{statusLabels[b.status]}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Suggestions */}
@@ -74,23 +94,27 @@ export default function ClientDashboard() {
           <h3 className="text-lg font-bold text-dark font-heading">Sugestões para Ti</h3>
           <Link to="/destinos" className="text-primary text-sm font-semibold hover:underline flex items-center gap-1">Ver mais <FiArrowRight size={14}/></Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {suggestions.map(s => (
-            <div key={s.id} className="card card-hover group overflow-hidden cursor-pointer">
-              <div className="h-36 overflow-hidden">
-                <img src={s.image} alt={s.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-              </div>
-              <div className="p-4">
-                <span className="badge-primary text-xs mb-2 inline-block">{s.category}</span>
-                <h4 className="font-bold text-dark text-sm mb-1">{s.name}</h4>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1"><FiStar size={12} className="text-secondary fill-secondary"/><span className="text-xs text-gray-600">{s.rating}</span></div>
-                  <span className="text-primary text-xs font-bold">{s.price}</span>
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 text-gray-500 py-8"><FiLoader className="animate-spin"/> A carregar...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {suggestions.map(s => (
+              <Link key={s.id} to={`/destinos/${s.id}`} className="card card-hover group overflow-hidden cursor-pointer block">
+                <div className="h-36 overflow-hidden">
+                  <img src={s.image} alt={s.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                <div className="p-4">
+                  <span className="badge-primary text-xs mb-2 inline-block">{s.category}</span>
+                  <h4 className="font-bold text-dark text-sm mb-1">{s.name}</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1"><FiStar size={12} className="text-secondary fill-secondary"/><span className="text-xs text-gray-600">{s.rating}</span></div>
+                    <span className="text-primary text-xs font-bold">{s.price}</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
