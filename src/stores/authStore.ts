@@ -10,6 +10,7 @@ interface AuthState {
   isLoading: boolean;
   // Autenticação real via API
   loginWithCredentials: (email: string, password: string) => Promise<void>;
+  registerWithCredentials: (name: string, email: string, password: string, role: 'client' | 'operator') => Promise<void>;
   logout: () => void;
   restoreSession: () => Promise<void>;
   // Mantido para demo rápido (sem backend)
@@ -33,6 +34,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const { token, user } = await authApi.login(email, password);
+      setToken(token);
+      set({ user, role: user.role, isAuthenticated: true, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false });
+      throw err;
+    }
+  },
+
+  registerWithCredentials: async (name, email, password, role) => {
+    set({ isLoading: true });
+    try {
+      const { token, user } = await authApi.register(name, email, password, role);
       setToken(token);
       set({ user, role: user.role, isAuthenticated: true, isLoading: false });
     } catch (err) {

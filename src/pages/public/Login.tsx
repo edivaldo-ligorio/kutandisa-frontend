@@ -12,21 +12,38 @@ const roles = [
   { id: 'admin'    as UserRole, label: 'Admin',     icon: <FiShield size={22}/>,    desc: 'Painel de controlo', path: '/admin',    color: 'bg-red-500',   email: 'admin@kutandisa.ao',  pass: 'admin123' },
 ];
 
+// Só cliente e operador podem auto-registar-se; contas admin são criadas manualmente.
+const registerRoles = roles.filter(r => r.id !== 'admin');
+
 export default function Login() {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
+  const [name, setName]         = useState('');
   const [email, setEmail]       = useState('maria@kutandisa.ao');
   const [password, setPassword] = useState('123456');
   const [showPass, setShowPass] = useState(false);
   const [error, setError]       = useState('');
 
-  const { loginWithCredentials, isLoading } = useAuthStore();
+  const { loginWithCredentials, registerWithCredentials, isLoading } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSelectRole = (r: typeof roles[0]) => {
     setSelectedRole(r.id);
-    setEmail(r.email);
-    setPassword(r.pass);
+    if (mode === 'login') { setEmail(r.email); setPassword(r.pass); }
     setError('');
+  };
+
+  const switchMode = (next: 'login' | 'register') => {
+    setMode(next);
+    setError('');
+    setName('');
+    if (next === 'register') {
+      setEmail(''); setPassword('');
+      if (selectedRole === 'admin') setSelectedRole('client');
+    } else {
+      const r = roles.find(r => r.id === selectedRole);
+      setEmail(r?.email || ''); setPassword(r?.pass || '');
+    }
   };
 
   const handleLogin = async () => {
@@ -37,7 +54,6 @@ export default function Login() {
       toast.success(`Bem-vindo ao painel ${r?.label}!`);
       navigate(r?.path || '/');
     } catch (err: any) {
-      // Fallback demo: se backend não disponível, usa switchRole
       if (err.message?.includes('fetch') || err.message?.includes('Failed')) {
         const { switchRole } = useAuthStore.getState();
         switchRole(selectedRole);
@@ -49,6 +65,24 @@ export default function Login() {
       }
     }
   };
+
+  const handleRegister = async () => {
+    setError('');
+    if (!name.trim()) { setError('Escreve o teu nome.'); return; }
+    if (!email.trim()) { setError('Escreve o teu email.'); return; }
+    if (password.length < 6) { setError('A palavra-passe deve ter pelo menos 6 caracteres.'); return; }
+    try {
+      await registerWithCredentials(name.trim(), email.trim(), password, selectedRole as 'client' | 'operator');
+      const r = roles.find(r => r.id === selectedRole);
+      toast.success('Conta criada com sucesso!');
+      navigate(r?.path || '/');
+    } catch (err: any) {
+      setError(err.message || 'Não foi possível criar a conta.');
+    }
+  };
+
+  const handleSubmit = () => mode === 'login' ? handleLogin() : handleRegister();
+  const activeRoles = mode === 'login' ? roles : registerRoles;
 
   return (
     <div className="min-h-screen flex">
@@ -83,16 +117,20 @@ export default function Login() {
       </div>
 
       {/* Right — form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white">
-        <motion.div initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} className="w-full max-w-md">
+      <div className="flex-1 flex items-center justify-center p-8 bg-white overflow-y-auto">
+        <motion.div initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} className="w-full max-w-md py-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-black font-heading text-dark mb-2">Entrar na Plataforma</h1>
-            <p className="text-gray-500">Seleciona o teu perfil para continuar</p>
+            <h1 className="text-3xl font-black font-heading text-dark mb-2">
+              {mode === 'login' ? 'Entrar na Plataforma' : 'Criar Conta'}
+            </h1>
+            <p className="text-gray-500">
+              {mode === 'login' ? 'Seleciona o teu perfil para continuar' : 'Regista-te gratuitamente como cliente ou operador'}
+            </p>
           </div>
 
           {/* Role selector */}
-          <div className="grid grid-cols-3 gap-3 mb-8">
-            {roles.map(r => (
+          <div className={`grid gap-3 mb-8 ${mode === 'login' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {activeRoles.map(r => (
               <button key={r.id} onClick={() => handleSelectRole(r)}
                 className={`p-4 rounded-2xl border-2 text-center transition-all duration-200 ${
                   selectedRole === r.id ? `border-primary bg-accent shadow-md` : 'border-gray-100 hover:border-gray-200'
@@ -111,6 +149,12 @@ export default function Login() {
           )}
 
           <div className="space-y-4 mb-6">
+            {mode === 'register' && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1.5 block">Nome</label>
+                <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="O teu nome completo" />
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1.5 block">Email</label>
               <input
@@ -129,7 +173,8 @@ export default function Login() {
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                  placeholder={mode === 'register' ? 'Mínimo 6 caracteres' : ''}
                 />
                 <button onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
                   {showPass ? <FiEyeOff size={18}/> : <FiEye size={18}/>}
@@ -139,30 +184,46 @@ export default function Login() {
           </div>
 
           <button
-            onClick={handleLogin}
+            onClick={handleSubmit}
             disabled={isLoading}
             className="btn-primary w-full justify-center text-base py-4 mb-4 disabled:opacity-60 disabled:cursor-not-allowed">
-            {isLoading ? 'A entrar...' : <>Entrar como {roles.find(r=>r.id===selectedRole)?.label} <FiArrowRight size={18}/></>}
+            {isLoading
+              ? (mode === 'login' ? 'A entrar...' : 'A criar conta...')
+              : mode === 'login'
+                ? <>Entrar como {roles.find(r=>r.id===selectedRole)?.label} <FiArrowRight size={18}/></>
+                : <>Criar Conta <FiArrowRight size={18}/></>
+            }
           </button>
 
           <p className="text-center text-sm text-gray-500">
-            Não tens conta?{' '}
-            <button onClick={handleLogin} className="text-primary font-semibold hover:underline">
-              Registar agora
-            </button>
+            {mode === 'login' ? (
+              <>Não tens conta?{' '}
+                <button onClick={() => switchMode('register')} className="text-primary font-semibold hover:underline">
+                  Registar agora
+                </button>
+              </>
+            ) : (
+              <>Já tens conta?{' '}
+                <button onClick={() => switchMode('login')} className="text-primary font-semibold hover:underline">
+                  Entrar
+                </button>
+              </>
+            )}
           </p>
 
-          <div className="mt-6 p-4 bg-accent rounded-xl border border-primary/20">
-            <p className="text-xs text-primary font-semibold mb-2">Credenciais de Demo</p>
-            <div className="space-y-1">
-              {roles.map(r => (
-                <div key={r.id} className="flex justify-between text-xs text-gray-600">
-                  <span className="font-medium">{r.label}:</span>
-                  <span className="font-mono">{r.email} / {r.pass}</span>
-                </div>
-              ))}
+          {mode === 'login' && (
+            <div className="mt-6 p-4 bg-accent rounded-xl border border-primary/20">
+              <p className="text-xs text-primary font-semibold mb-2">Credenciais de Demo</p>
+              <div className="space-y-1">
+                {roles.map(r => (
+                  <div key={r.id} className="flex justify-between text-xs text-gray-600">
+                    <span className="font-medium">{r.label}:</span>
+                    <span className="font-mono">{r.email} / {r.pass}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
       </div>
     </div>
