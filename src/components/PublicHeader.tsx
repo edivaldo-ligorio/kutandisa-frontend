@@ -97,7 +97,7 @@ export default function PublicHeader() {
               <Link to="/entrar" className={`text-sm font-semibold px-5 py-2 rounded-full border-2 transition-all ${
                 scrolled ? 'border-primary text-primary hover:bg-primary hover:text-white' : 'border-white text-white hover:bg-white hover:text-dark'
               }`}>Entrar</Link>
-              <Link to="/entrar" className="text-sm font-semibold px-5 py-2 rounded-full bg-secondary text-dark hover:bg-secondary-dark transition-all shadow-md hover:shadow-lg">
+              <Link to="/entrar?mode=register" className="text-sm font-semibold px-5 py-2 rounded-full bg-secondary text-dark hover:bg-secondary-dark transition-all shadow-md hover:shadow-lg">
                 Registar
               </Link>
             </>
@@ -131,7 +131,7 @@ export default function PublicHeader() {
                 ) : (
                   <>
                     <Link to="/entrar" onClick={() => setMenuOpen(false)} className="btn-outline justify-center">Entrar</Link>
-                    <Link to="/entrar" onClick={() => setMenuOpen(false)} className="btn-secondary justify-center">Registar</Link>
+                    <Link to="/entrar?mode=register" onClick={() => setMenuOpen(false)} className="btn-secondary justify-center">Registar</Link>
                   </>
                 )}
               </div>

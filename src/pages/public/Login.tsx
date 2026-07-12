@@ -1,68 +1,50 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiUser, FiBriefcase, FiShield, FiArrowRight, FiEye, FiEyeOff, FiArrowLeft, FiAlertCircle } from 'react-icons/fi';
+import { FiUser, FiBriefcase, FiArrowRight, FiEye, FiEyeOff, FiArrowLeft, FiAlertCircle } from 'react-icons/fi';
 import { useAuthStore } from '../../stores/authStore';
-import type { UserRole } from '../../stores/authStore';
 import toast from 'react-hot-toast';
 
-const roles = [
-  { id: 'client'   as UserRole, label: 'Cliente',   icon: <FiUser size={22}/>,      desc: 'Reservas e viagens', path: '/cliente',  color: 'bg-primary',   email: 'maria@kutandisa.ao',  pass: '123456'   },
-  { id: 'operator' as UserRole, label: 'Operador',  icon: <FiBriefcase size={22}/>, desc: 'Gerir serviços',     path: '/operador', color: 'bg-secondary', email: 'hotel@kutandisa.ao',  pass: 'hotel123' },
-  { id: 'admin'    as UserRole, label: 'Admin',     icon: <FiShield size={22}/>,    desc: 'Painel de controlo', path: '/admin',    color: 'bg-red-500',   email: 'admin@kutandisa.ao',  pass: 'admin123' },
+const rolePaths: Record<string, string> = { client: '/cliente', operator: '/operador', admin: '/admin' };
+
+// Escolha de tipo de conta — só usada ao CRIAR conta, nunca ao entrar.
+const accountTypes = [
+  { id: 'client'   as const, label: 'Cliente',  icon: <FiUser size={20}/>,      desc: 'Reservas e viagens' },
+  { id: 'operator' as const, label: 'Operador', icon: <FiBriefcase size={20}/>, desc: 'Gerir serviços' },
 ];
 
-// Só cliente e operador podem auto-registar-se; contas admin são criadas manualmente.
-const registerRoles = roles.filter(r => r.id !== 'admin');
-
 export default function Login() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('client');
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<'login' | 'register'>(searchParams.get('mode') === 'register' ? 'register' : 'login');
+  const [accountType, setAccountType] = useState<'client' | 'operator'>('client');
   const [name, setName]         = useState('');
-  const [email, setEmail]       = useState('maria@kutandisa.ao');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError]       = useState('');
 
   const { loginWithCredentials, registerWithCredentials, isLoading } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleSelectRole = (r: typeof roles[0]) => {
-    setSelectedRole(r.id);
-    if (mode === 'login') { setEmail(r.email); setPassword(r.pass); }
-    setError('');
-  };
-
   const switchMode = (next: 'login' | 'register') => {
     setMode(next);
     setError('');
     setName('');
-    if (next === 'register') {
-      setEmail(''); setPassword('');
-      if (selectedRole === 'admin') setSelectedRole('client');
-    } else {
-      const r = roles.find(r => r.id === selectedRole);
-      setEmail(r?.email || ''); setPassword(r?.pass || '');
-    }
+    setEmail('');
+    setPassword('');
   };
 
   const handleLogin = async () => {
     setError('');
+    if (!email.trim() || !password) { setError('Preenche o email e a palavra-passe.'); return; }
     try {
-      await loginWithCredentials(email, password);
-      const r = roles.find(r => r.id === selectedRole);
-      toast.success(`Bem-vindo ao painel ${r?.label}!`);
-      navigate(r?.path || '/');
+      await loginWithCredentials(email.trim(), password);
+      const { role, user } = useAuthStore.getState();
+      toast.success(`Bem-vindo, ${user?.name?.split(' ')[0]}!`);
+      navigate(rolePaths[role] || '/');
     } catch (err: any) {
-      if (err.message?.includes('fetch') || err.message?.includes('Failed')) {
-        const { switchRole } = useAuthStore.getState();
-        switchRole(selectedRole);
-        const r = roles.find(r => r.id === selectedRole);
-        toast.success(`Demo: Bem-vindo ao painel ${r?.label}!`);
-        navigate(r?.path || '/');
-      } else {
-        setError(err.message || 'Credenciais inválidas');
-      }
+      const isNetworkError = err.message?.includes('fetch') || err.message?.includes('Failed');
+      setError(isNetworkError ? 'Não foi possível ligar ao servidor. Tenta novamente dentro de momentos.' : (err.message || 'Credenciais inválidas.'));
     }
   };
 
@@ -72,17 +54,16 @@ export default function Login() {
     if (!email.trim()) { setError('Escreve o teu email.'); return; }
     if (password.length < 6) { setError('A palavra-passe deve ter pelo menos 6 caracteres.'); return; }
     try {
-      await registerWithCredentials(name.trim(), email.trim(), password, selectedRole as 'client' | 'operator');
-      const r = roles.find(r => r.id === selectedRole);
+      await registerWithCredentials(name.trim(), email.trim(), password, accountType);
       toast.success('Conta criada com sucesso!');
-      navigate(r?.path || '/');
+      navigate(rolePaths[accountType] || '/');
     } catch (err: any) {
-      setError(err.message || 'Não foi possível criar a conta.');
+      const isNetworkError = err.message?.includes('fetch') || err.message?.includes('Failed');
+      setError(isNetworkError ? 'Não foi possível ligar ao servidor. Tenta novamente dentro de momentos.' : (err.message || 'Não foi possível criar a conta.'));
     }
   };
 
   const handleSubmit = () => mode === 'login' ? handleLogin() : handleRegister();
-  const activeRoles = mode === 'login' ? roles : registerRoles;
 
   return (
     <div className="min-h-screen flex">
@@ -124,23 +105,25 @@ export default function Login() {
               {mode === 'login' ? 'Entrar na Plataforma' : 'Criar Conta'}
             </h1>
             <p className="text-gray-500">
-              {mode === 'login' ? 'Seleciona o teu perfil para continuar' : 'Regista-te gratuitamente como cliente ou operador'}
+              {mode === 'login' ? 'Introduz as tuas credenciais para continuar' : 'Regista-te gratuitamente em segundos'}
             </p>
           </div>
 
-          {/* Role selector */}
-          <div className={`grid gap-3 mb-8 ${mode === 'login' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            {activeRoles.map(r => (
-              <button key={r.id} onClick={() => handleSelectRole(r)}
-                className={`p-4 rounded-2xl border-2 text-center transition-all duration-200 ${
-                  selectedRole === r.id ? `border-primary bg-accent shadow-md` : 'border-gray-100 hover:border-gray-200'
-                }`}>
-                <div className={`w-10 h-10 ${r.color} rounded-xl flex items-center justify-center text-white mx-auto mb-2`}>{r.icon}</div>
-                <p className={`text-xs font-bold ${selectedRole===r.id?'text-primary':'text-dark'}`}>{r.label}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{r.desc}</p>
-              </button>
-            ))}
-          </div>
+          {/* Tipo de conta — só no registo */}
+          {mode === 'register' && (
+            <div className="grid grid-cols-2 gap-3 mb-8">
+              {accountTypes.map(t => (
+                <button key={t.id} onClick={() => setAccountType(t.id)}
+                  className={`p-4 rounded-2xl border-2 text-center transition-all duration-200 ${
+                    accountType === t.id ? 'border-primary bg-accent shadow-md' : 'border-gray-100 hover:border-gray-200'
+                  }`}>
+                  <div className={`w-10 h-10 ${t.id==='client'?'bg-primary':'bg-secondary'} rounded-xl flex items-center justify-center text-white mx-auto mb-2`}>{t.icon}</div>
+                  <p className={`text-xs font-bold ${accountType===t.id?'text-primary':'text-dark'}`}>{t.label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.desc}</p>
+                </button>
+              ))}
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
@@ -190,7 +173,7 @@ export default function Login() {
             {isLoading
               ? (mode === 'login' ? 'A entrar...' : 'A criar conta...')
               : mode === 'login'
-                ? <>Entrar como {roles.find(r=>r.id===selectedRole)?.label} <FiArrowRight size={18}/></>
+                ? <>Entrar <FiArrowRight size={18}/></>
                 : <>Criar Conta <FiArrowRight size={18}/></>
             }
           </button>
@@ -210,20 +193,6 @@ export default function Login() {
               </>
             )}
           </p>
-
-          {mode === 'login' && (
-            <div className="mt-6 p-4 bg-accent rounded-xl border border-primary/20">
-              <p className="text-xs text-primary font-semibold mb-2">Credenciais de Demo</p>
-              <div className="space-y-1">
-                {roles.map(r => (
-                  <div key={r.id} className="flex justify-between text-xs text-gray-600">
-                    <span className="font-medium">{r.label}:</span>
-                    <span className="font-mono">{r.email} / {r.pass}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </motion.div>
       </div>
     </div>
