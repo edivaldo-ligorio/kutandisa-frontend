@@ -2,6 +2,9 @@ import { Link } from 'react-router-dom';
 import { destinations as allDests } from '../../data/destinations';
 import { motion } from 'framer-motion';
 import { FiMapPin, FiStar, FiArrowRight, FiShield, FiUsers, FiAward, FiCompass } from 'react-icons/fi';
+import { useAuthStore } from '../../stores/authStore';
+
+const rolePaths: Record<string, string> = { client: '/cliente', operator: '/operador', admin: '/admin' };
 
 const destinations = allDests.slice(0, 3);
 
@@ -34,6 +37,7 @@ const features = [
 const fadeUp = { hidden:{opacity:0,y:30}, show:{opacity:1,y:0} };
 
 export default function Home() {
+  const { isAuthenticated, role, user } = useAuthStore();
   return (
     <div className="overflow-x-hidden">
 
@@ -223,14 +227,17 @@ export default function Home() {
         <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-white/5 rounded-full" />
         <div className="relative max-w-4xl mx-auto px-6 text-center">
           <h2 className="text-4xl md:text-5xl font-black font-heading mb-6">
-            Pronto para descobrir Angola?
+            {isAuthenticated ? `Pronta para a próxima aventura, ${user?.name?.split(' ')[0]}?` : 'Pronto para descobrir Angola?'}
           </h2>
           <p className="text-white/80 text-xl mb-10 max-w-2xl mx-auto">
-            Regista-te gratuitamente e começa a planear a tua próxima aventura.
+            {isAuthenticated ? 'Explora novos destinos ou vê as tuas reservas no teu painel.' : 'Regista-te gratuitamente e começa a planear a tua próxima aventura.'}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/entrar" className="inline-flex items-center gap-2 px-8 py-4 bg-secondary text-dark font-bold rounded-full text-lg hover:bg-secondary-light transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1">
-              Começar Agora <FiArrowRight size={20}/>
+            <Link
+              to={isAuthenticated ? (rolePaths[role] || '/') : '/entrar'}
+              className="inline-flex items-center gap-2 px-8 py-4 bg-secondary text-dark font-bold rounded-full text-lg hover:bg-secondary-light transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
+            >
+              {isAuthenticated ? 'Ir para o Meu Painel' : 'Começar Agora'} <FiArrowRight size={20}/>
             </Link>
             <Link to="/destinos" className="inline-flex items-center gap-2 px-8 py-4 border-2 border-white text-white font-bold rounded-full text-lg hover:bg-white hover:text-primary transition-all">
               Ver Destinos
