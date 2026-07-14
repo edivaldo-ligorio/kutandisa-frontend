@@ -20,7 +20,7 @@ export default function ClientProfile() {
           {[
             { label:'Nome completo', icon:<FiUser size={16}/>, defaultValue:user?.name },
             { label:'Email',         icon:<FiMail size={16}/>, defaultValue:user?.email },
-            { label:'Telefone',      icon:<FiPhone size={16}/>, defaultValue:'+244 923 000 000' },
+            { label:'Telefone',      icon:<FiPhone size={16}/>, defaultValue:'+244 923 500 500' },
             { label:'Localização',   icon:<FiMapPin size={16}/>, defaultValue:'Luanda, Angola' },
           ].map((f,i) => (
             <div key={i}>
