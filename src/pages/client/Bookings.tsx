@@ -56,7 +56,7 @@ export default function ClientBookings() {
         <div className="card overflow-hidden">
           <table className="data-table">
             <thead>
-              <tr><th>Destino</th><th>Data</th><th>Operador</th><th>Preço</th><th>Pessoas</th><th>Estado</th></tr>
+              <tr><th>Destino</th><th>Data</th><th>Operador</th><th>Preço</th><th>Pessoas</th><th>Pontos</th><th>Estado</th></tr>
             </thead>
             <tbody>
               {filtered.map(b => (
@@ -66,6 +66,11 @@ export default function ClientBookings() {
                   <td className="text-gray-600">{b.operator || '—'}</td>
                   <td className="font-bold text-primary">{formatKz(b.amount)}</td>
                   <td className="text-gray-600">{b.people}</td>
+                  <td className="text-xs">
+                    {b.pointsEarned > 0 && <span className="text-green-600 font-semibold">+{b.pointsEarned} pts</span>}
+                    {b.pointsRedeemed > 0 && <span className="text-gray-400"> -{b.pointsRedeemed} pts usados</span>}
+                    {b.pointsEarned === 0 && b.pointsRedeemed === 0 && <span className="text-gray-300">—</span>}
+                  </td>
                   <td><span className={`badge text-xs ${statusColor[b.status]}`}>{statusLabel[b.status]}</span></td>
                 </tr>
               ))}

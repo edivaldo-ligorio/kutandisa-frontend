@@ -3,7 +3,7 @@ import { FiCalendar, FiHeart, FiMapPin, FiStar, FiArrowRight, FiClock, FiLoader 
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import StatsCard from '../../components/StatsCard';
-import { bookingsApi, destinationsApi, favouritesApi, Booking, Destination } from '../../services/api';
+import { bookingsApi, destinationsApi, favouritesApi, loyaltyApi, Booking, Destination } from '../../services/api';
 
 const statusColors: Record<string, string> = { confirmed:'badge-green', pending:'badge-yellow', cancelled:'badge-red' };
 const statusLabels: Record<string, string> = { confirmed:'Confirmado', pending:'Pendente', cancelled:'Cancelado' };
@@ -13,11 +13,12 @@ export default function ClientDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [suggestions, setSuggestions] = useState<Destination[]>([]);
   const [favouritesCount, setFavouritesCount] = useState(0);
+  const [points, setPoints] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([bookingsApi.getAll(), destinationsApi.getAll(), favouritesApi.getAll()])
-      .then(([b, d, f]) => {
+    Promise.all([bookingsApi.getAll(), destinationsApi.getAll(), favouritesApi.getAll(), loyaltyApi.getBalance()])
+      .then(([b, d, f, l]) => {
         setBookings(b.data);
         // sugestões: destinos com melhor avaliação que o cliente ainda não reservou
         const bookedIds = new Set(b.data.map(x => x.destinationId));
@@ -28,6 +29,7 @@ export default function ClientDashboard() {
             .slice(0, 3)
         );
         setFavouritesCount(f.total);
+        setPoints(l.points);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -55,7 +57,7 @@ export default function ClientDashboard() {
         <StatsCard title="Reservas Activas" value={String(bookings.filter(b=>b.status!=='cancelled').length)} icon={<FiCalendar size={20}/>} />
         <StatsCard title="Destinos Visitados" value={String(visitedCount)} icon={<FiMapPin size={20}/>} />
         <StatsCard title="Favoritos" value={String(favouritesCount)} icon={<FiHeart size={20}/>} />
-        <StatsCard title="Avaliações Feitas" value="0" icon={<FiStar size={20}/>} change="em breve" changePositive={false} />
+        <StatsCard title="Pontos Kutandisa" value={String(points)} icon={<FiStar size={20}/>} change="1 pt = 1.000 Kz" />
       </div>
 
       {/* Upcoming Bookings */}

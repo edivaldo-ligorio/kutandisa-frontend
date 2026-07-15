@@ -6,7 +6,7 @@ import {
   FiCheckCircle, FiCamera, FiShare2, FiHeart, FiTrendingUp, FiLoader
 } from 'react-icons/fi';
 import { destinations } from '../../data/destinations';
-import { favouritesApi, bookingsApi } from '../../services/api';
+import { favouritesApi, bookingsApi, loyaltyApi } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 
 const difficultyColor: Record<string, string> = {
@@ -29,6 +29,16 @@ export default function DestinationDetail() {
   const [bookingDone, setBookingDone] = useState(false);
   const [bookingError, setBookingError] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
+  const [points, setPoints] = useState(0);
+  const [kzPerPoint, setKzPerPoint] = useState(100);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'client') return;
+    loyaltyApi.getBalance()
+      .then(res => { setPoints(res.points); setKzPerPoint(res.kzPerPointRedeemed); })
+      .catch(() => {});
+  }, [isAuthenticated, role]);
 
   const handleShare = async () => {
     if (!dest) return;
@@ -72,6 +82,15 @@ export default function DestinationDetail() {
     return Number(first.replace(/[^\d]/g, '')) || 0;
   };
 
+  const baseAmount = dest ? parsePrice(dest.price) * bookingPeople : 0;
+  const maxRedeemablePoints = Math.min(points, Math.floor(baseAmount / kzPerPoint));
+  const discount = pointsToRedeem * kzPerPoint;
+  const finalAmount = Math.max(0, baseAmount - discount);
+
+  useEffect(() => {
+    setPointsToRedeem(p => Math.min(p, maxRedeemablePoints));
+  }, [maxRedeemablePoints]);
+
   const handleBook = async () => {
     if (!dest) return;
     if (!isAuthenticated || role !== 'client') {
@@ -88,9 +107,12 @@ export default function DestinationDetail() {
       await bookingsApi.create({
         destinationId: dest.id,
         date: bookingDate,
-        amount: parsePrice(dest.price) * bookingPeople,
+        amount: baseAmount,
         people: bookingPeople,
+        pointsToRedeem,
       });
+      setPoints(p => p - pointsToRedeem);
+      setPointsToRedeem(0);
       setBookingDone(true);
     } catch (err: any) {
       setBookingError(err.message || 'Não foi possível criar a reserva.');
@@ -302,6 +324,33 @@ export default function DestinationDetail() {
                     {[1,2,3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} pessoa{n>1?'s':''}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {isAuthenticated && role === 'client' && points > 0 && (
+                <div className="bg-accent rounded-xl p-3 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-primary">Usar pontos Kutandisa</label>
+                    <span className="text-xs text-gray-500">Tens {points} pts</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={maxRedeemablePoints}
+                    value={pointsToRedeem}
+                    onChange={e => setPointsToRedeem(Number(e.target.value))}
+                    disabled={maxRedeemablePoints === 0}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex items-center justify-between text-xs mt-1">
+                    <span className="text-gray-500">{pointsToRedeem} pts resgatados</span>
+                    <span className="font-semibold text-primary">-{new Intl.NumberFormat('pt-AO').format(discount)} Kz</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-sm mb-4 pb-4 border-b border-gray-100">
+                <span className="text-gray-500">Total</span>
+                <span className="font-black text-lg text-dark">{new Intl.NumberFormat('pt-AO').format(finalAmount)} Kz</span>
               </div>
 
               {bookingError && (

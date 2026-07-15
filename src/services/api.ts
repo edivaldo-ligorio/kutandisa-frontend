@@ -63,7 +63,7 @@ export const bookingsApi = {
     const q = status ? `?status=${status}` : '';
     return apiFetch<{ data: Booking[]; total: number }>(`/bookings${q}`);
   },
-  create: (data: Partial<Booking>) =>
+  create: (data: { destinationId: number; operatorId?: number; date: string; amount: number; people: number; pointsToRedeem?: number }) =>
     apiFetch<Booking>('/bookings', { method: 'POST', body: JSON.stringify(data) }),
   updateStatus: (id: number, status: string) =>
     apiFetch<{ booking: Booking }>(`/bookings/${id}/status`, {
@@ -118,6 +118,16 @@ export const contactApi = {
     apiFetch<{ message: string }>('/contact', { method: 'POST', body: JSON.stringify(data) }),
 };
 
+// ── Loyalty (pontos Kutandisa) ──────────────────────────────
+export interface LoyaltyBalance {
+  points: number;
+  kzPerPointRedeemed: number;
+  kzPerPointEarned: number;
+}
+export const loyaltyApi = {
+  getBalance: () => apiFetch<LoyaltyBalance>('/loyalty'),
+};
+
 // ── Types ─────────────────────────────────────────────────────
 export interface User {
   id: number;
@@ -161,6 +171,8 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled';
   amount: number;
   people: number;
+  pointsRedeemed: number;
+  pointsEarned: number;
 }
 
 export interface Operator {

@@ -50,7 +50,7 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-4">Contacto</h4>
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2"><FiMapPin size={15} className="text-secondary" /> Talatona, Luanda</li>
-              <li className="flex items-center gap-2"><FiPhone size={15} className="text-secondary" /> +244 923 500 500</li>
+              <li className="flex items-center gap-2"><FiPhone size={15} className="text-secondary" /> +244 923 000 000</li>
               <li className="flex items-center gap-2"><FiMail size={15} className="text-secondary" /> info&#64;kutandisa.ao</li>
             </ul>
           </div>
